@@ -1,0 +1,27 @@
+[
+    {
+        "city": "New York",
+        "population": 8419000,
+        "area": "8000"
+    },
+    {
+        "city": "Los Angeles",
+        "population": 3980000,
+        "area": 1302.0
+    },
+    {
+        "city": "Chicago",
+        "population": 2716000,
+        "area": 606.1
+    },
+    {
+        "city": "Houston",
+        "population": 2328000,
+        "area": 1651.1
+    },
+    {
+        "city": "Phoenix",
+        "population": 1690000,
+        "area": 1340.6
+    }
+]
