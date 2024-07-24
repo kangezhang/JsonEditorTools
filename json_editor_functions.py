@@ -5,19 +5,16 @@
 
 import json
 import pandas as pd
-import tkinter as tk
-from tkinter import filedialog, messagebox
-
+import dearpygui.dearpygui as dpg
 
 class JsonEditorFunctions:
     def __init__(self, dpg_instance):
         self.df = None
         self.file_path = ""
         self.dpg = dpg_instance
-        self.column_types = {}  # 用于存储每列的数据类型
+        self.column_types = {}
 
-    def open_json(self):
-        file_path = self.open_file_dialog()
+    def open_json(self, file_path):
         if file_path:
             try:
                 with open(file_path, "r", encoding="utf-8") as file:
@@ -30,12 +27,6 @@ class JsonEditorFunctions:
             except Exception as e:
                 self.show_message(f"Failed to open JSON file: {e}")
 
-    def open_file_dialog(self):
-        root = tk.Tk()
-        root.withdraw()  # 隐藏主窗口
-        file_path = filedialog.askopenfilename(filetypes=[("JSON files", "*.json")])
-        return file_path
-
     def save_json(self):
         if self.df is not None:
             try:
@@ -47,9 +38,8 @@ class JsonEditorFunctions:
                 self.show_message(f"Failed to save JSON file: {e}")
 
     def show_message(self, message):
-        root = tk.Tk()
-        root.withdraw()
-        messagebox.showinfo("Information", message)
+        self.dpg.set_value("message_text", message)
+        self.dpg.show_item("message_box")
 
     def edit_cell(self, sender, app_data, user_data):
         index, col = user_data

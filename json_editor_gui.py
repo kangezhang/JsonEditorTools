@@ -4,26 +4,20 @@
 # Copyright (c) 2024 zhang kang All rights reserved.
 # -*- coding: utf-8 -*-
 
-import tkinter as tk  # 导入tkinter模块，用于图形用户界面
-from tkinter import filedialog, messagebox  # 从tkinter模块导入文件对话框和消息框
-import dearpygui.dearpygui as dpg  # 导入Dear PyGui库，用于创建图形用户界面
-import platform  # 导入platform模块，用于检测操作系统
-from json_editor_functions import (
-    JsonEditorFunctions,
-)  # 从json_editor_functions模块导入JsonEditorFunctions类
+import dearpygui.dearpygui as dpg
+import platform
+from json_editor_functions import JsonEditorFunctions
 import os
+import subprocess
+import sys
 
+class JsonEditorApp(JsonEditorFunctions):
+    def __init__(self):
+        super().__init__(dpg)
+        self.column_width = 150
 
-class JsonEditorApp(
-    JsonEditorFunctions
-):  # 定义JsonEditorApp类，继承自JsonEditorFunctions
-    def __init__(self):  # 初始化函数
-        super().__init__(dpg)  # 调用父类的初始化函数
-        self.column_width = 150  # 每列的固定宽度
+        dpg.create_context()
 
-        dpg.create_context()  # 创建Dear PyGui上下文
-
-        # 初始化视口
         dpg.create_viewport(
             title="JSON Editor",
             width=1024,
@@ -33,8 +27,6 @@ class JsonEditorApp(
             large_icon="1.ico",
         )
 
-        # 注册字体
-
         FONT = self.get_font_path()
         with dpg.font_registry():
             with dpg.font(FONT, 20) as ft:
@@ -43,7 +35,6 @@ class JsonEditorApp(
                 dpg.add_font_range_hint(dpg.mvFontRangeHint_Chinese_Full)
             dpg.bind_font(ft)
 
-        # 主窗口
         with dpg.window(
             label="Main Window",
             no_title_bar=True,
@@ -54,59 +45,44 @@ class JsonEditorApp(
             width=-1,
             height=-1,
         ):
-            self.create_menu()  # 创建菜单
-            self.create_table_window()  # 创建表格窗口
+            self.create_menu()
+            self.create_table_window()
 
-        # 创建对话框
-        self.create_dialogs()  # 创建各种对话框
+        self.create_dialogs()
 
-        # 设置 Dear PyGui
-        dpg.setup_dearpygui()  # 设置Dear PyGui
-        dpg.show_viewport()  # 显示视口
+        dpg.setup_dearpygui()
+        dpg.show_viewport()
 
-        # 设置窗口大小变化的回调函数
-        dpg.set_viewport_resize_callback(
-            self.resize_callback
-        )  # 设置视口大小调整回调函数
+        dpg.set_viewport_resize_callback(self.resize_callback)
 
-    def get_font_path(self):  # 获取字体路径函数
+    def get_font_path(self):
         if platform.system() == "Windows":
-            return "C:/Windows/Fonts/simhei.ttf"  # Arial字体路径
-        elif platform.system() == "Darwin":  # macOS
-            return "/System/Library/Fonts/Supplemental/Arial.ttf"  # macOS系统字体路径
+            return "C:/Windows/Fonts/simhei.ttf"
+        elif platform.system() == "Darwin":
+            return "/System/Library/Fonts/Supplemental/Arial.ttf"
         else:
-            return (
-                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"  # Linux系统字体路径
-            )
+            return "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 
-    def create_menu(self):  # 创建菜单函数
+    def create_menu(self):
         with dpg.menu_bar():
             with dpg.menu(label="File"):
-                dpg.add_menu_item(
-                    label="打开 JSON", callback=self.open_json
-                )  # 添加打开JSON菜单项
+                dpg.add_menu_item(label="Open JSON", callback=self.show_open_file_dialog)
                 self.save_menu_item = dpg.add_menu_item(
                     label="Save JSON",
                     callback=self.save_json,
-                    enabled=False,  # 添加保存JSON菜单项，默认禁用
+                    enabled=False,
                 )
 
             with dpg.menu(label="Edit"):
-                dpg.add_menu_item(
-                    label="Add Row", callback=self.add_row
-                )  # 添加添加行菜单项
-                dpg.add_menu_item(
-                    label="Add Column",
-                    callback=self.show_add_column_dialog,  # 添加添加列菜单项
-                )
-                dpg.add_menu_item(
-                    label="Delete Row", callback=self.show_delete_row_dialog
-                )  # 添加删除行菜单项
-                dpg.add_menu_item(
-                    label="Delete Column", callback=self.show_delete_column_dialog
-                )  # 添加删除列菜单项
+                dpg.add_menu_item(label="Add Row", callback=self.add_row)
+                dpg.add_menu_item(label="Add Column", callback=self.show_add_column_dialog)
+                dpg.add_menu_item(label="Delete Row", callback=self.show_delete_row_dialog)
+                dpg.add_menu_item(label="Delete Column", callback=self.show_delete_column_dialog)
 
-    def create_table_window(self):  # 创建表格窗口函数
+            with dpg.menu(label="Editor"):
+                dpg.add_menu_item(label="Settings", callback=self.show_settings_dialog)
+
+    def create_table_window(self):
         with dpg.child_window(
             width=-1, height=-1, horizontal_scrollbar=True, tag="Table Window"
         ):
@@ -117,124 +93,146 @@ class JsonEditorApp(
                 borders_outerH=True,
                 borders_innerV=True,
                 borders_outerV=True,
-                policy=dpg.mvTable_SizingFixedFit,  # 确保列宽固定
+                policy=dpg.mvTable_SizingFixedFit,
             )
 
-    def create_dialogs(self):  # 创建对话框函数
-        # 添加列对话框
+    def create_dialogs(self):
         with dpg.window(label="Add Column", show=False, tag="column_dialog"):
-            dpg.add_input_text(
-                label="Column Name", tag="new_column_name"
-            )  # 添加输入框，用于输入列名
-            dpg.add_combo(
-                label="Column Type",
-                items=["string", "int", "float", "bool"],
-                tag="new_column_type",  # 添加下拉框，用于选择列类型
-            )
-            dpg.add_button(
-                label="Add", callback=self.add_column_name
-            )  # 添加按钮，用于添加列
+            dpg.add_input_text(label="Column Name", tag="new_column_name")
+            dpg.add_combo(label="Column Type", items=["string", "int", "float", "bool"], tag="new_column_type")
+            dpg.add_button(label="Add", callback=self.add_column_name)
 
-        # 删除行对话框
         with dpg.window(label="Delete Row", show=False, tag="row_dialog"):
-            dpg.add_input_int(
-                label="Row Index", tag="row_index"
-            )  # 添加输入框，用于输入行索引
-            dpg.add_button(
-                label="Delete", callback=self.delete_row_by_index
-            )  # 添加按钮，用于删除行
+            dpg.add_input_int(label="Row Index", tag="row_index")
+            dpg.add_button(label="Delete", callback=self.delete_row_by_index)
 
-        # 删除列对话框
         with dpg.window(label="Delete Column", show=False, tag="column_delete_dialog"):
-            dpg.add_input_text(
-                label="Column Name", tag="column_name_delete"
-            )  # 添加输入框，用于输入列名
-            dpg.add_button(
-                label="Delete", callback=self.delete_column_by_name
-            )  # 添加按钮，用于删除列
+            dpg.add_input_text(label="Column Name", tag="column_name_delete")
+            dpg.add_button(label="Delete", callback=self.delete_column_by_name)
 
-        # 修改列名对话框
         with dpg.window(label="Edit Column Name", show=False, tag="edit_column_dialog"):
-            dpg.add_input_text(
-                label="Current Column Name", tag="current_column_name"
-            )  # 添加输入框，用于输入当前列名
-            dpg.add_input_text(
-                label="New Column Name", tag="new_column_name_edit"
-            )  # 添加输入框，用于输入新列名
-            dpg.add_button(
-                label="Rename", callback=self.edit_column_name
-            )  # 添加按钮，用于重命名列
+            dpg.add_input_text(label="Current Column Name", tag="current_column_name")
+            dpg.add_input_text(label="New Column Name", tag="new_column_name_edit")
+            dpg.add_button(label="Rename", callback=self.edit_column_name)
 
-    def resize_callback(self, sender, app_data):  # 视口大小调整回调函数
-        width, height = (
-            dpg.get_viewport_client_width(),  # 获取视口宽度
-            dpg.get_viewport_client_height(),  # 获取视口高度
-        )
-        dpg.set_item_width("Main Window", width)  # 设置主窗口宽度
-        dpg.set_item_height("Main Window", height)  # 设置主窗口高度
-        dpg.set_item_width("Table Window", width - 20)  # 留出一点空间以便水平滚动条
-        dpg.set_item_height("Table Window", height - 60)  # 留出一些高度以便菜单和滚动条
+        with dpg.window(label="Message Box", show=False, tag="message_box"):
+            dpg.add_text("", tag="message_text")
+            dpg.add_button(label="OK", callback=lambda: dpg.hide_item("message_box"))
 
-    def update_table(self):  # 更新表格函数
-        dpg.delete_item(self.table_id, children_only=True)  # 删除表格中的所有子项
-        if self.df is None:  # 如果数据框为空，返回
+        with dpg.file_dialog(directory_selector=False, show=False, callback=self.open_file_callback, tag="file_dialog_id"):
+            dpg.add_file_extension(".json", color=(150, 255, 150, 255))
+
+        with dpg.window(label="Settings", show=False, tag="settings_dialog"):
+            dpg.add_checkbox(label="Enable Feature", tag="enable_feature_checkbox")
+            dpg.add_button(label="Apply", callback=self.apply_settings)
+
+    def resize_callback(self, sender, app_data):
+        width, height = dpg.get_viewport_client_width(), dpg.get_viewport_client_height()
+        dpg.set_item_width("Main Window", width)
+        dpg.set_item_height("Main Window", height)
+        dpg.set_item_width("Table Window", width - 20)
+        dpg.set_item_height("Table Window", height - 60)
+
+    def update_table(self):
+        dpg.delete_item(self.table_id, children_only=True)
+        if self.df is None:
             return
 
-        columns = list(self.df.columns)  # 获取数据框的列名
-        total_width = len(columns) * self.column_width  # 计算表格总宽度
+        columns = list(self.df.columns)
+        total_width = len(columns) * self.column_width
 
-        dpg.set_item_width(self.table_id, total_width)  # 设置表格宽度
+        dpg.set_item_width(self.table_id, total_width)
 
-        # 设置表格列
         for col in columns:
-            dpg.add_table_column(
-                label=col, parent=self.table_id, width=self.column_width  # 添加表格列
-            )
+            dpg.add_table_column(label=col, parent=self.table_id, width=self.column_width)
 
-        # 添加数据类型选项
         with dpg.table_row(parent=self.table_id):
             for col in columns:
-                dpg.add_combo(
-                    items=["string", "int", "float", "bool"],
-                    default_value=self.column_types.get(col, "string"),
-                    user_data=col,
-                    callback=self.change_column_type,  # 添加下拉框，用于选择列类型
-                )
+                dpg.add_combo(items=["string", "int", "float", "bool"], default_value=self.column_types.get(col, "string"), user_data=col, callback=self.change_column_type)
 
-        # 添加数据行
         for index, row in self.df.iterrows():
             with dpg.table_row(parent=self.table_id):
                 for col in columns:
                     if self.column_types.get(col) == "bool":
-                        dpg.add_combo(
-                            items=["True", "False"],
-                            default_value="True" if row[col] else "False",
-                            user_data=(index, col),
-                            callback=self.edit_cell,
-                            width=self.column_width,  # 设置每个输入框的宽度
-                        )
+                        dpg.add_combo(items=["True", "False"], default_value="True" if row[col] else "False", user_data=(index, col), callback=self.edit_cell, width=self.column_width)
                     else:
-                        dpg.add_input_text(
-                            default_value=str(row[col]),
-                            callback=self.edit_cell,
-                            user_data=(index, col),
-                            width=self.column_width,  # 设置每个输入框的宽度
-                        )
+                        dpg.add_input_text(default_value=str(row[col]), callback=self.edit_cell, user_data=(index, col), width=self.column_width)
 
-    def show_add_column_dialog(self):  # 显示添加列对话框函数
+    def show_add_column_dialog(self):
         dpg.show_item("column_dialog")
 
-    def show_delete_row_dialog(self):  # 显示删除行对话框函数
+    def show_delete_row_dialog(self):
         dpg.show_item("row_dialog")
 
-    def show_delete_column_dialog(self):  # 显示删除列对话框函数
+    def show_delete_column_dialog(self):
         dpg.show_item("column_delete_dialog")
 
-    def run(self):  # 运行函数
-        dpg.start_dearpygui()  # 启动Dear PyGui
-        dpg.destroy_context()  # 销毁Dear PyGui上下文
+    def show_open_file_dialog(self):
+        dpg.show_item("file_dialog_id")
 
+    def open_file_callback(self, sender, app_data):
+        self.open_json(app_data['file_path_name'])
 
-if __name__ == "__main__":  # 主程序入口
-    app = JsonEditorApp()  # 创建JsonEditorApp实例
-    app.run()  # 运行应用程序
+    def show_settings_dialog(self):
+        dpg.show_item("settings_dialog")
+
+    def apply_settings(self):
+        is_enabled = dpg.get_value("enable_feature_checkbox")
+        if is_enabled:
+            self.set_file_association()
+        else:
+            self.remove_file_association()
+        dpg.hide_item("settings_dialog")
+        self.show_message(f"Settings applied. Feature enabled: {is_enabled}")
+
+    def set_file_association(self):
+        if platform.system() == "Windows":
+            try:
+                exe_path = os.path.abspath(sys.argv[0])
+                reg_content = f'''
+                Windows Registry Editor Version 5.00
+
+                [HKEY_CLASSES_ROOT\\.json]
+                @="JsonEditorFile"
+
+                [HKEY_CLASSES_ROOT\\JsonEditorFile]
+                @="JSON File"
+                "Content Type"="application/json"
+
+                [HKEY_CLASSES_ROOT\\JsonEditorFile\\shell\\open\\command]
+                @="\\"{exe_path}\\" \\"%1\\""
+                '''
+
+                with open("file_association.reg", "w") as reg_file:
+                    reg_file.write(reg_content)
+
+                subprocess.run(['reg', 'import', 'file_association.reg'], check=True)
+                os.remove("file_association.reg")
+            except Exception as e:
+                self.show_message(f"Failed to set file association: {e}")
+
+    def remove_file_association(self):
+        if platform.system() == "Windows":
+            try:
+                reg_content = '''
+                Windows Registry Editor Version 5.00
+
+                [-HKEY_CLASSES_ROOT\\.json]
+                [-HKEY_CLASSES_ROOT\\JsonEditorFile]
+                '''
+
+                with open("remove_file_association.reg", "w") as reg_file:
+                    reg_file.write(reg_content)
+
+                subprocess.run(['reg', 'import', 'remove_file_association.reg'], check=True)
+                os.remove("remove_file_association.reg")
+            except Exception as e:
+                self.show_message(f"Failed to remove file association: {e}")
+
+    def run(self):
+        dpg.start_dearpygui()
+        dpg.destroy_context()
+
+if __name__ == "__main__":
+    app = JsonEditorApp()
+    app.run()

@@ -1,0 +1,13 @@
+
+                Windows Registry Editor Version 5.00
+
+                [HKEY_CLASSES_ROOT\.json]
+                @="JsonEditorFile"
+
+                [HKEY_CLASSES_ROOT\JsonEditorFile]
+                @="JSON File"
+                "Content Type"="application/json"
+
+                [HKEY_CLASSES_ROOT\JsonEditorFile\shell\open\command]
+                @="\"D:\Projects\JsonEditorTools\json_editor_gui.py\" \"%1\""
+                

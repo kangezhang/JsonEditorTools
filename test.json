@@ -1,14 +1,14 @@
 [
     {
-        "city": "New York",
+        "city": "纽约",
         "population": 8419000,
         "area": false,
         "f": false,
         "1": false,
-        "2": false
+        "2": true
     },
     {
-        "city": "Los Angeles",
+        "city": "关羽",
         "population": 3980000,
         "area": false,
         "f": true,
@@ -29,7 +29,7 @@
         "area": false,
         "f": false,
         "1": false,
-        "2": false
+        "2": true
     },
     {
         "city": "Phoenix",
