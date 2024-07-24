@@ -2,26 +2,41 @@
     {
         "city": "New York",
         "population": 8419000,
-        "area": "7000"
+        "area": false,
+        "f": false,
+        "1": false,
+        "2": false
     },
     {
         "city": "Los Angeles",
         "population": 3980000,
-        "area": 1302.0
+        "area": false,
+        "f": true,
+        "1": false,
+        "2": false
     },
     {
         "city": "Chicago",
         "population": 2716000,
-        "area": 606.1
+        "area": 606.1,
+        "f": true,
+        "1": false,
+        "2": false
     },
     {
         "city": "Houston",
         "population": 2328000,
-        "area": 1651.1
+        "area": false,
+        "f": false,
+        "1": false,
+        "2": false
     },
     {
         "city": "Phoenix",
         "population": 1690000,
-        "area": 1340.6
+        "area": 1340.6,
+        "f": true,
+        "1": false,
+        "2": false
     }
 ]
