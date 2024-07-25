@@ -7,9 +7,6 @@
 import dearpygui.dearpygui as dpg  # 导入Dear PyGui库，用于创建图形用户界面
 import platform  # 导入platform模块，用于检测操作系统
 from json_editor_functions import JsonEditorFunctions  # 导入JsonEditorFunctions类
-import os
-import subprocess
-import sys
 import pandas as pd  # 导入pandas库，用于数据处理
 
 
@@ -19,7 +16,7 @@ class JsonEditorApp(
     def __init__(self):  # 初始化函数
         super().__init__(dpg)  # 调用父类的初始化函数
         self.column_width = 150  # 每列的固定宽度
-        self.language = "English"  # 默认语言为英语
+        self.language = "Chinese"  # 默认语言为英语
 
         dpg.create_context()  # 创建Dear PyGui上下文
 
@@ -137,6 +134,7 @@ class JsonEditorApp(
             no_resize=True,  # 不可调整大小
             no_move=True,  # 不可移动
             no_collapse=True,  # 不可折叠
+            no_close=True,  # 不可关闭
             tag="Main Window",  # 主窗口标签
             width=-1,  # 宽度
             height=-1,  # 高度
@@ -166,11 +164,7 @@ class JsonEditorApp(
             with dpg.menu(
                 label=self.texts[self.language]["file_menu"], tag="file_menu"
             ):  # 创建文件菜单
-                dpg.add_menu_item(
-                    label=self.texts[self.language]["open_json"],
-                    callback=self.show_open_file_dialog,
-                    tag="open_json_menu_item",
-                )  # 添加打开JSON菜单项
+                dpg.add_menu_item(label="Open JSON", callback=self.show_open_file_dialog)
                 self.save_menu_item = dpg.add_menu_item(  # 添加保存JSON菜单项
                     label=self.texts[self.language]["save_json"],  # 菜单项标签
                     callback=self.save_json,  # 回调函数
@@ -183,7 +177,7 @@ class JsonEditorApp(
             ):  # 创建编辑菜单
                 dpg.add_menu_item(
                     label=self.texts[self.language]["add_row"],
-                    callback=self.show_add_row_dialog,
+                    callback=self.add_row,
                     tag="add_row_menu_item",
                 )  # 添加添加行菜单项
                 dpg.add_menu_item(
@@ -210,7 +204,7 @@ class JsonEditorApp(
             with dpg.menu(
                 label=self.texts[self.language]["editor_menu"], tag="editor_menu"
             ):  # 创建编辑器菜单
-                dpg.add_menu_item(
+                self.setting_menu_item = dpg.add_menu_item(
                     label=self.texts[self.language]["settings"],
                     callback=self.show_settings_dialog,
                     tag="settings_menu_item",
@@ -249,30 +243,29 @@ class JsonEditorApp(
                 callback=self.add_column_name,
                 tag="add_column_button",
             )  # 添加按钮，用于添加列
+            dpg.add_same_line()
             dpg.add_button(
                 label=self.texts[self.language]["close"],
                 callback=lambda: dpg.hide_item("column_dialog"),
                 tag="close_column_dialog_button",
             )  # 添加关闭按钮
+        
 
+        # 删除行对话框
         with dpg.window(
-            label=self.texts[self.language]["delete_row_dialog"],
+            label=self.texts[self.language]["delete_row"],
             show=False,
-            tag="row_dialog",
-        ):  # 创建删除行对话框
+            tag="delete_row_dialog",  # 更正这个标签
+        ):
             dpg.add_input_int(
                 label=self.texts[self.language]["row_index"], tag="row_index"
             )  # 添加输入框，用于输入行索引
             dpg.add_button(
                 label=self.texts[self.language]["delete"],
-                callback=self.delete_row_by_index,
+                callback=self.delete_row_by_index,  # 确保回调函数是正确的
                 tag="delete_row_button",
             )  # 添加按钮，用于删除行
-            dpg.add_button(
-                label=self.texts[self.language]["close"],
-                callback=lambda: dpg.hide_item("row_dialog"),
-                tag="close_row_dialog_button",
-            )  # 添加关闭按钮
+
 
         with dpg.window(
             label=self.texts[self.language]["delete_column_dialog"],
@@ -288,6 +281,7 @@ class JsonEditorApp(
                 callback=self.delete_column_by_name,
                 tag="delete_column_button",
             )  # 添加按钮，用于删除列
+            dpg.add_same_line()
             dpg.add_button(
                 label=self.texts[self.language]["close"],
                 callback=lambda: dpg.hide_item("column_delete_dialog"),
@@ -297,6 +291,7 @@ class JsonEditorApp(
         with dpg.window(
             label=self.texts[self.language]["edit_column_dialog"],
             show=False,
+            modal=True,
             tag="edit_column_dialog",
         ):  # 创建编辑列名对话框
             dpg.add_input_text(
@@ -312,6 +307,7 @@ class JsonEditorApp(
                 callback=self.edit_column_name,
                 tag="rename_column_button",
             )  # 添加按钮，用于重命名列
+            dpg.add_same_line()
             dpg.add_button(
                 label=self.texts[self.language]["close"],
                 callback=lambda: dpg.hide_item("edit_column_dialog"),
@@ -343,17 +339,14 @@ class JsonEditorApp(
         with dpg.window(
             label=self.texts[self.language]["settings_dialog"],
             show=False,
+            modal=True, #模态窗口可以让用户在关闭对话框之前无法与其他窗口交互
             tag="settings_dialog",
         ):  # 创建设置对话框
             dpg.add_checkbox(
                 label=self.texts[self.language]["enable_feature"],
                 tag="enable_feature_checkbox",
             )  # 添加复选框，用于启用功能
-            dpg.add_button(
-                label=self.texts[self.language]["apply"],
-                callback=self.apply_settings,
-                tag="apply_settings_button",
-            )  # 添加按钮，用于应用设置
+            
             dpg.add_combo(
                 label=self.texts[self.language]["language"],
                 items=[
@@ -365,10 +358,11 @@ class JsonEditorApp(
                 callback=self.change_language,
             )  # 添加下拉框，用于选择语言
             dpg.add_button(
-                label=self.texts[self.language]["close"],
-                callback=lambda: dpg.hide_item("settings_dialog"),
-                tag="close_settings_dialog_button",
-            )  # 添加关闭按钮
+                label=self.texts[self.language]["apply"],
+                callback=self.apply_settings,
+                tag="apply_settings_button",
+            )  # 添加按钮，用于应用设置
+            dpg.add_same_line()
 
         with dpg.file_dialog(
             directory_selector=False,
@@ -386,6 +380,7 @@ class JsonEditorApp(
         with dpg.window(
             label=self.texts[self.language]["import_excel_dialog"],
             show=False,
+            modal=False,
             tag="import_excel_dialog",
         ):  # 创建导入Excel列对话框
             dpg.add_button(
@@ -415,11 +410,13 @@ class JsonEditorApp(
                 callback=self.import_excel_column,
                 tag="import_excel_column_button",
             )  # 添加按钮，用于导入Excel列
+            dpg.add_same_line()
             dpg.add_button(
                 label=self.texts[self.language]["close"],
                 callback=lambda: dpg.hide_item("import_excel_dialog"),
                 tag="close_import_excel_dialog_button",
             )  # 添加关闭按钮
+
 
     def resize_callback(self, sender, app_data):  # 视口大小调整回调函数
         width, height = (
@@ -479,27 +476,46 @@ class JsonEditorApp(
         dpg.focus_item("row_dialog")  # 使对话框获得焦点
 
     def show_add_column_dialog(self):  # 显示添加列对话框函数
+        dpg.configure_item("column_dialog")
+        dpg.set_item_width("column_dialog", 420)
+        dpg.set_item_height("column_dialog", 240)
         dpg.show_item("column_dialog")  # 显示对话框
         dpg.focus_item("column_dialog")  # 使对话框获得焦点
 
     def show_delete_row_dialog(self):  # 显示删除行对话框函数
-        dpg.show_item("row_dialog")  # 显示对话框
-        dpg.focus_item("row_dialog")  # 使对话框获得焦点
+        dpg.configure_item("delete_row_dialog")
+        dpg.set_item_width("delete_row_dialog", 420)
+        dpg.set_item_height("delete_row_dialog", 240)
+        dpg.show_item("delete_row_dialog")  # 使用匹配的标签
+        dpg.focus_item("delete_row_dialog")  # 使对话框获得焦点
+
 
     def show_delete_column_dialog(self):  # 显示删除列对话框函数
+        dpg.configure_item("column_delete_dialog")
+        dpg.set_item_width("column_delete_dialog", 420)
+        dpg.set_item_height("column_delete_dialog", 240)
         dpg.show_item("column_delete_dialog")  # 显示对话框
         dpg.focus_item("column_delete_dialog")  # 使对话框获得焦点
 
     def show_open_file_dialog(self):  # 显示打开文件对话框函数
-        dpg.hide_item("file_dialog_id")
+
+        dpg.set_item_width("file_dialog_id", 680)
+        dpg.set_item_height("file_dialog_id", 420)
         dpg.show_item("file_dialog_id")  # 显示对话框
         dpg.focus_item("file_dialog_id")  # 使对话框获得焦点
 
     def show_settings_dialog(self):  # 显示设置对话框函数
+        #dpg.hide_item("file_dialog_id")
+        dpg.configure_item("settings_dialog")
+        dpg.set_item_width("settings_dialog", 420)
+        dpg.set_item_height("settings_dialog", 240)
         dpg.show_item("settings_dialog")  # 显示对话框
         dpg.focus_item("settings_dialog")  # 使对话框获得焦点
 
     def show_import_excel_dialog(self):  # 显示导入Excel列对话框函数
+        dpg.configure_item("import_excel_dialog")
+        dpg.set_item_width("import_excel_dialog", 420)
+        dpg.set_item_height("import_excel_dialog", 300)
         dpg.show_item("import_excel_dialog")  # 显示对话框
         dpg.focus_item("import_excel_dialog")  # 使对话框获得焦点
 
@@ -573,7 +589,9 @@ class JsonEditorApp(
     def refresh_ui_texts(self):
         # 更新窗口和菜单栏的标签
         dpg.set_item_label("Main Window", self.texts[self.language]["main_window"])
+        #dpg.set_item_label(self.open_menu_item, self.texts[self.language]["open_json"])
         dpg.set_item_label(self.save_menu_item, self.texts[self.language]["save_json"])
+        dpg.set_item_label(self.setting_menu_item, self.texts[self.language]["settings"])
 
         # 更新菜单标签
         menu_items = {
@@ -594,6 +612,11 @@ class JsonEditorApp(
                 ("close", "close"),
             ],
             "row_dialog": [
+                ("row_index", "row_index"),
+                ("add", "add"),
+                ("close", "close"),
+            ],
+            "row_delete_dialog": [
                 ("row_index", "row_index"),
                 ("delete", "delete"),
                 ("close", "close"),
