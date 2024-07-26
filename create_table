@@ -1,0 +1,35 @@
+import dearpygui.dearpygui as dpg
+
+dpg.create_context()
+
+
+# Callback function for table cell
+def cell_callback(sender, app_data, user_data):
+    print(f"Cell {user_data} clicked")
+
+
+# Create a window
+with dpg.window(label="Indexed Table"):
+    with dpg.table(header_row=True, resizable=True, policy=dpg.mvTable_SizingFixedFit):
+        # Adding the header row
+        dpg.add_table_column(label="Index")
+        for col_index in range(5):  # 5 columns for this example
+            dpg.add_table_column(label=f"Column {col_index + 1}")
+
+        # Adding rows with index
+        for row_index in range(5):  # 5 rows for this example
+            with dpg.table_row():
+                dpg.add_text(f"Row {row_index + 1}")
+                for col_index in range(5):
+                    cell_id = f"Row {row_index + 1}, Column {col_index + 1}"
+                    dpg.add_button(
+                        label=f"Cell {col_index + 1}",
+                        callback=cell_callback,
+                        user_data=cell_id,
+                    )
+
+dpg.create_viewport(title="Indexed Table Example", width=600, height=300)
+dpg.setup_dearpygui()
+dpg.show_viewport()
+dpg.start_dearpygui()
+dpg.destroy_context()
