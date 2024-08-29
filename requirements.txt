@@ -1,2 +1,4 @@
 pandas
 openpyxl
+pillow
+pyside6

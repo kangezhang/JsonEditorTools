@@ -1,193 +1,214 @@
-import dearpygui.dearpygui as dpg
-from PIL import Image
+from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QComboBox,
+                               QSpinBox, QFileDialog, QCheckBox, QHBoxLayout)
+from PySide6.QtGui import QPixmap, QImage
+from PySide6.QtCore import Qt, QThread, Signal
 import os
 import time
-import threading
+from PIL import Image
 
-# 全局变量用于存储选择的文件路径和动画参数
-selected_files = []
-play_animation = False
-frame_rate = 30
-loop_animation = True
 
-# 文件选择器回调函数
-def callback_function(sender, app_data):
-    global selected_files
-    selected_files = []
-    folder_path = app_data['file_path_name']
-    for file_name in os.listdir(folder_path):
-        if file_name.lower().endswith(('.png', '.jpg', '.jpeg')):
-            selected_files.append(os.path.join(folder_path, file_name))
-    print(selected_files)
+class GifToPngConverter(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.selected_files = []
+        self.play_animation = False
+        self.frame_rate = 30
+        self.loop_animation = True
+        self.init_ui()
 
-# 选择文件按钮的回调函数
-def select_files(sender, app_data):
-    with dpg.file_dialog(directory_selector=True, width=420, height=220, show=True, callback=callback_function):
-        dpg.add_file_extension(".*")
+    def init_ui(self):
+        self.setWindowTitle('Contact Sheet Creator')
+        self.setFixedSize(560, 700)
 
-# 创建联系表的函数
-def create_contact_sheet():
-    global selected_files
-    if not selected_files:
-        print("No files selected")
-        return None
-    
-    # 获取行数和列数以及图像大小
-    rows = dpg.get_value("rows")
-    columns = dpg.get_value("columns")
-    size = int(dpg.get_value("image_size"))
+        layout = QVBoxLayout()
 
-    if rows * columns < len(selected_files):
-        print("Error: Rows * Columns must be greater than or equal to the number of selected images.")
-        return None
-    
-    images = [Image.open(file) for file in selected_files]
-    
-    # 假设所有图像大小相同
-    img_width, img_height = images[0].size
-    
-    # 计算缩放比例
-    scale = size / max(img_width * columns, img_height * rows)
-    
-    # 缩放图像
-    images = [img.resize((int(img_width * scale), int(img_height * scale)), Image.Resampling.LANCZOS) for img in images]
-    
-    # 创建空白阵列图
-    contact_sheet = Image.new(images[0].mode, (columns * images[0].width, rows * images[0].height))
-    
-    # 粘贴图像
-    for index, img in enumerate(images):
-        x = index % columns * img.width
-        y = index // columns * img.height
-        contact_sheet.paste(img, (x, y))
-    
-    return contact_sheet
+        self.mode_selector = QComboBox()
+        self.mode_selector.addItems(["Contact Sheet", "Animation"])
+        self.mode_selector.currentIndexChanged.connect(self.switch_mode)
+        layout.addWidget(self.mode_selector)
 
-# 预览按钮的回调函数
-def preview_contact_sheet(sender, app_data):
-    contact_sheet = create_contact_sheet()
-    if contact_sheet:
-        contact_sheet.thumbnail((420, 420))
-        contact_sheet.save("preview.png")
+        # Contact sheet controls
+        self.contact_sheet_controls = QWidget()
+        contact_sheet_layout = QVBoxLayout()
 
-        # 删除旧纹理和旧图像
-        if dpg.does_item_exist("preview_texture"):
-            dpg.delete_item("preview_texture")
-        if dpg.does_item_exist("preview_image_display"):
-            dpg.delete_item("preview_image_display")
+        self.select_folder_button = QPushButton("Select Folder")
+        self.select_folder_button.clicked.connect(self.select_files)
+        contact_sheet_layout.addWidget(self.select_folder_button)
 
-        # 添加新纹理
-        width, height, channels, data = dpg.load_image("preview.png")
-        with dpg.texture_registry():
-            dpg.add_static_texture(width, height, data, tag="preview_texture")
-        
-        # 添加新图像
-        dpg.add_image("preview_texture", parent="preview_window", tag="preview_image_display")
+        grid_layout = QHBoxLayout()
+        grid_layout.addWidget(QLabel("Rows:"))
+        self.rows_spinbox = QSpinBox()
+        self.rows_spinbox.setRange(1, 10)
+        self.rows_spinbox.setValue(4)
+        grid_layout.addWidget(self.rows_spinbox)
+        grid_layout.addWidget(QLabel("Columns:"))
+        self.columns_spinbox = QSpinBox()
+        self.columns_spinbox.setRange(1, 10)
+        self.columns_spinbox.setValue(4)
+        grid_layout.addWidget(self.columns_spinbox)
+        contact_sheet_layout.addLayout(grid_layout)
 
-# 保存按钮的回调函数
-def save_contact_sheet(sender, app_data):
-    contact_sheet = create_contact_sheet()
-    if contact_sheet:
-        contact_sheet.save("contact_sheet.png")
-        print("Contact sheet created and saved as 'contact_sheet.png'")
+        image_size_layout = QHBoxLayout()
+        image_size_layout.addWidget(QLabel("Image Size:"))
+        self.image_size_combo = QComboBox()
+        self.image_size_combo.addItems(["1024", "2048", "4096"])
+        self.image_size_combo.setCurrentText("1024")
+        image_size_layout.addWidget(self.image_size_combo)
+        contact_sheet_layout.addLayout(image_size_layout)
 
-# 动画播放线程函数
-def play_animation_thread():
-    global play_animation, frame_rate, loop_animation, selected_files
-    frame_interval = 1.0 / frame_rate
+        preview_save_layout = QHBoxLayout()
+        self.preview_button = QPushButton("Preview")
+        self.preview_button.clicked.connect(self.preview_contact_sheet)
+        preview_save_layout.addWidget(self.preview_button)
+        self.save_button = QPushButton("Save")
+        self.save_button.clicked.connect(self.save_contact_sheet)
+        preview_save_layout.addWidget(self.save_button)
+        contact_sheet_layout.addLayout(preview_save_layout)
 
-    while play_animation:
-        for file in selected_files:
-            if not play_animation:
+        self.contact_sheet_controls.setLayout(contact_sheet_layout)
+        layout.addWidget(self.contact_sheet_controls)
+
+        # Animation controls
+        self.animation_controls = QWidget()
+        animation_layout = QVBoxLayout()
+
+        self.select_folder_button_anim = QPushButton("Select Folder")
+        self.select_folder_button_anim.clicked.connect(self.select_files)
+        animation_layout.addWidget(self.select_folder_button_anim)
+
+        frame_rate_layout = QHBoxLayout()
+        frame_rate_layout.addWidget(QLabel("Frame Rate:"))
+        self.frame_rate_spinbox = QSpinBox()
+        self.frame_rate_spinbox.setRange(1, 60)
+        self.frame_rate_spinbox.setValue(30)
+        frame_rate_layout.addWidget(self.frame_rate_spinbox)
+        animation_layout.addLayout(frame_rate_layout)
+
+        self.loop_checkbox = QCheckBox("Loop Animation")
+        self.loop_checkbox.setChecked(True)
+        animation_layout.addWidget(self.loop_checkbox)
+
+        start_stop_layout = QHBoxLayout()
+        self.start_button = QPushButton("Start Animation")
+        self.start_button.clicked.connect(self.start_animation)
+        start_stop_layout.addWidget(self.start_button)
+        self.stop_button = QPushButton("Stop Animation")
+        self.stop_button.clicked.connect(self.stop_animation)
+        start_stop_layout.addWidget(self.stop_button)
+        animation_layout.addLayout(start_stop_layout)
+
+        self.animation_controls.setLayout(animation_layout)
+        self.animation_controls.setVisible(False)
+        layout.addWidget(self.animation_controls)
+
+        # Preview area
+        layout.addWidget(QLabel("Preview Window:"))
+        self.preview_label = QLabel()
+        self.preview_label.setFixedSize(420, 420)
+        layout.addWidget(self.preview_label)
+
+        self.setLayout(layout)
+
+    def select_files(self):
+        folder_path = QFileDialog.getExistingDirectory(self, "Select Folder")
+        if folder_path:
+            self.selected_files = [os.path.join(folder_path, f) for f in os.listdir(folder_path)
+                                   if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+            print(self.selected_files)
+
+    def switch_mode(self):
+        mode = self.mode_selector.currentText()
+        if mode == "Contact Sheet":
+            self.contact_sheet_controls.setVisible(True)
+            self.animation_controls.setVisible(False)
+        elif mode == "Animation":
+            self.contact_sheet_controls.setVisible(False)
+            self.animation_controls.setVisible(True)
+
+    def create_contact_sheet(self):
+        if not self.selected_files:
+            print("No files selected")
+            return None
+
+        rows = self.rows_spinbox.value()
+        columns = self.columns_spinbox.value()
+        size = int(self.image_size_combo.currentText())
+
+        if rows * columns < len(self.selected_files):
+            print("Error: Rows * Columns must be greater than or equal to the number of selected images.")
+            return None
+
+        images = [Image.open(file) for file in self.selected_files]
+
+        img_width, img_height = images[0].size
+        scale = size / max(img_width * columns, img_height * rows)
+        images = [img.resize((int(img_width * scale), int(img_height * scale)), Image.Resampling.LANCZOS) for img in images]
+
+        contact_sheet = Image.new(images[0].mode, (columns * images[0].width, rows * images[0].height))
+        for index, img in enumerate(images):
+            x = index % columns * img.width
+            y = index // columns * img.height
+            contact_sheet.paste(img, (x, y))
+
+        return contact_sheet
+
+    def preview_contact_sheet(self):
+        contact_sheet = self.create_contact_sheet()
+        if contact_sheet:
+            contact_sheet.thumbnail((420, 420))
+            contact_sheet.save("preview.png")
+            self.preview_label.setPixmap(QPixmap("preview.png"))
+
+    def save_contact_sheet(self):
+        contact_sheet = self.create_contact_sheet()
+        if contact_sheet:
+            contact_sheet.save("contact_sheet.png")
+            print("Contact sheet created and saved as 'contact_sheet.png'")
+
+    def start_animation(self):
+        self.play_animation = True
+        self.frame_rate = self.frame_rate_spinbox.value()
+        self.loop_animation = self.loop_checkbox.isChecked()
+
+        self.animation_thread = AnimationThread(self.selected_files, self.frame_rate, self.loop_animation, self.preview_label)
+        self.animation_thread.start()
+
+    def stop_animation(self):
+        self.play_animation = False
+        if hasattr(self, 'animation_thread'):
+            self.animation_thread.stop()
+
+class AnimationThread(QThread):
+    def __init__(self, selected_files, frame_rate, loop_animation, preview_label):
+        super().__init__()
+        self.selected_files = selected_files
+        self.frame_rate = frame_rate
+        self.loop_animation = loop_animation
+        self.preview_label = preview_label
+        self.play_animation = True
+
+    def run(self):
+        frame_interval = 1.0 / self.frame_rate
+        while self.play_animation:
+            for file in self.selected_files:
+                if not self.play_animation:
+                    break
+                image = QImage(file)
+                pixmap = QPixmap.fromImage(image.scaled(self.preview_label.size(), Qt.KeepAspectRatio))
+                self.preview_label.setPixmap(pixmap)
+                time.sleep(frame_interval)
+            if not self.loop_animation:
                 break
 
-            # 删除旧纹理和旧图像
-            if dpg.does_item_exist("preview_texture"):
-                dpg.delete_item("preview_texture")
-            if dpg.does_item_exist("preview_image_display"):
-                dpg.delete_item("preview_image_display")
+    def stop(self):
+        self.play_animation = False
+        self.quit()
 
-            # 添加新纹理
-            width, height, channels, data = dpg.load_image(file)
-            with dpg.texture_registry():
-                dpg.add_static_texture(width, height, data, tag="preview_texture")
-            
-            # 添加新图像
-            dpg.add_image("preview_texture", parent="preview_window", tag="preview_image_display")
 
-            time.sleep(frame_interval)
+if __name__ == "__main__":
+    app = QApplication([])
 
-        if not loop_animation:
-            break
+    window = GifToPngConverter()
+    window.show()
 
-# 开始动画播放
-def start_animation(sender, app_data):
-    global play_animation, frame_rate, loop_animation
-    play_animation = True
-    frame_rate = dpg.get_value("frame_rate")
-    loop_animation = dpg.get_value("loop_animation")
-
-    animation_thread = threading.Thread(target=play_animation_thread)
-    animation_thread.start()
-
-# 停止动画播放
-def stop_animation(sender, app_data):
-    global play_animation
-    play_animation = False
-
-# 模式切换回调函数
-def switch_mode(sender, app_data):
-    mode = dpg.get_value("mode_selector")
-    if mode == "Contact Sheet":
-        dpg.show_item("contact_sheet_controls")
-        dpg.hide_item("animation_controls")
-    elif mode == "Animation":
-        dpg.hide_item("contact_sheet_controls")
-        dpg.show_item("animation_controls")
-
-# 创建DearPyGui用户界面
-dpg.create_context()
-
-with dpg.texture_registry(show=False):
-    # 初始化一个空的纹理
-    dpg.add_static_texture(1, 1, [0, 0, 0, 0], tag="preview_texture")
-
-window_width, window_height = 560, 700  # 主窗口大小
-
-with dpg.window(label="Contact Sheet Creator", width=window_width, height=window_height, no_move=True, no_resize=True, no_close=True, no_collapse=True, no_title_bar=True):
-    dpg.add_combo(label="Mode", items=["Contact Sheet", "Animation"], default_value="Contact Sheet", callback=switch_mode, tag="mode_selector")
-
-    with dpg.group(horizontal=False, tag="contact_sheet_controls"):
-        dpg.add_button(label="Select Folder", callback=select_files)
-        with dpg.group(horizontal=True):
-            dpg.add_text("Rows:")
-            dpg.add_input_int(default_value=4, min_value=1, max_value=10, width=100, tag="rows")
-            dpg.add_text("Columns:")
-            dpg.add_input_int(default_value=4, min_value=1, max_value=10, width=100, tag="columns")
-        with dpg.group(horizontal=True):
-            dpg.add_text("Image Size:")
-            dpg.add_combo(items=["1024", "2048", "4096"], default_value="1024", tag="image_size")
-        with dpg.group(horizontal=True):
-            dpg.add_button(label="Preview", callback=preview_contact_sheet)
-            dpg.add_button(label="Save", callback=save_contact_sheet)
-
-    with dpg.group(horizontal=False, tag="animation_controls", show=False):
-        with dpg.group(horizontal=True):
-            dpg.add_button(label="Select Folder", callback=select_files)
-            dpg.add_text("Frame Rate:")
-            dpg.add_input_int(default_value=30, min_value=1, max_value=60, width=100, tag="frame_rate")
-            dpg.add_checkbox(label="Loop Animation", default_value=True, tag="loop_animation")
-        with dpg.group(horizontal=True):
-            dpg.add_button(label="Start Animation", callback=start_animation)
-            dpg.add_button(label="Stop Animation", callback=stop_animation)
-
-    dpg.add_text("Preview Window:")
-    with dpg.child_window(tag="preview_window", width=436, height=436):
-        dpg.add_image("preview_texture", tag="preview_image_display", width=420, height=420)
-
-# 设置系统窗口大小并禁止调整大小
-dpg.create_viewport(title='Contact Sheet Creator', width=window_width, height=window_height, resizable=False)
-dpg.setup_dearpygui()
-dpg.show_viewport()
-dpg.start_dearpygui()
-dpg.destroy_context()
+    app.exec()
